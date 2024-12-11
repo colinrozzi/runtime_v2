@@ -13,21 +13,22 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Parse command line arguments
     let args = Args::parse();
 
-    // Create and initialize the runtime
-    println!("Creating actor runtime...");
-    let mut runtime = ActorRuntime::from_file(args.manifest).await?;
+    println!("Starting actor runtime...");
+    let (mut runtime, _tx) = ActorRuntime::from_file(args.manifest).await?;
 
-    println!("Actor '{}' initialized successfully!", runtime.config.name);
+    let runtime_handle = tokio::spawn(async move {
+        if let Err(e) = runtime.run().await {
+            eprintln!("Runtime error: {}", e);
+        }
+    });
 
-    // Wait for Ctrl+C
     println!("Actor is running. Press Ctrl+C to exit.");
     tokio::signal::ctrl_c().await?;
 
     println!("Shutting down...");
-    runtime.shutdown().await?;
-
+    runtime_handle.abort();
+    
     Ok(())
 }
